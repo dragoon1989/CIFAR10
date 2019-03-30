@@ -1,1 +1,1 @@
-# CIFAR10
+study deep learning on CIFAR10 project
