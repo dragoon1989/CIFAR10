@@ -21,8 +21,13 @@ def inference(images):
 								padding='same',
 								kernel_initializer=trun_nrm_init,
 								bias_initializer=zero_init,
-								activation=tf.nn.relu)
+								activation=None)
 		conv = conv_layer1.apply(images)
+		# add BN
+		# NOTE : the image format is HWC
+		conv = keras.layers.BatchNormalization(axis=3)(conv)
+		# activation
+		conv = keras.layers.Activation(activation=tf.nn.relu)(conv)
 		# summary conv layer weights
 		#tf.summary.histogram(name='conv1_weights', values=conv_layer1.weights[0])
 		#tf.summary.histogram(name='conv1-weights', values=conv_layer1.weights)
@@ -32,8 +37,13 @@ def inference(images):
 								padding='same',
 								kernel_initializer=trun_nrm_init,
 								bias_initializer=zero_init,
-								activation=tf.nn.relu)
+								activation=None)
 		conv = conv_layer2.apply(conv)
+		# add BN
+		conv = keras.layers.BatchNormalization(axis=3)(conv)
+		# activation
+		conv = keras.layers.Activation(activation=tf.nn.relu)(conv)
+		# max-pool
 		pool = keras.layers.MaxPool2D(pool_size=(2,2),
 							   strides=(2,2),
 							   padding='same')(conv)
@@ -47,8 +57,13 @@ def inference(images):
 								padding='same',
 								kernel_initializer=trun_nrm_init,
 								bias_initializer=zero_init,
-								activation=tf.nn.relu)
+								activation=None)
 		conv = conv_layer3.apply(drop)
+		# add BN
+		conv = keras.layers.BatchNormalization(axis=3)(conv)
+		# activation
+		conv = keras.layers.Activation(activation=tf.nn.relu)(conv)
+		# max-pool
 		pool = keras.layers.MaxPool2D(pool_size=(2,2),
 							   strides=(2,2),
 							   padding='same')(conv)
@@ -58,8 +73,13 @@ def inference(images):
 								padding='same',
 								kernel_initializer=trun_nrm_init,
 								bias_initializer=zero_init,
-								activation=tf.nn.relu)
+								activation=None)
 		conv = conv_layer4.apply(pool)
+		# add BN
+		conv = keras.layers.BatchNormalization(axis=3)(conv)
+		# activation
+		conv = keras.layers.Activation(activation=tf.nn.relu)(conv)
+		# max-pool
 		pool = keras.layers.MaxPool2D(pool_size=(2,2),
 							   strides=(2,2),
 							   padding='same')(conv)
