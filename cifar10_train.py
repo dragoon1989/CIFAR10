@@ -55,13 +55,13 @@ with tf.name_scope('optimization'):
     #optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
     #grad_var_pairs = optimizer.compute_gradients(loss)
     #train_op = optimizer.apply_gradients(grad_var_pairs, global_step=global_step)
-    #train_op = tf.train.GradientDescentOptimizer(learning_rate=1e-5).minimize(batch_loss, global_step)
-
+    train_op = tf.train.GradientDescentOptimizer(learning_rate=1e-5).minimize(batch_loss, global_step)
+'''
     train_op = tf.train.AdamOptimizer(learning_rate=1e-3,
                                        beta1=0.9,
                                        beta2=0.999,
                                        epsilon=1e-08).minimize(batch_loss, global_step=global_step)
-
+'''
 with tf.name_scope('train_batch_accuracy'):
     # compute batch predictions (dtype cast to tf.int32)
     batch_predictions = tf.to_int32(tf.math.argmax(tf.nn.softmax(logits_before_softmax), axis=1))
