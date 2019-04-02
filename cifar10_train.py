@@ -19,6 +19,9 @@ summary_path = './tensorboard/'
 summary_name = 'summary-default'    # tensorboard default summary dir
 num_epochs = 20
 
+# add a switch to control model checkpoint saver (because we do not need checkpoint when studying)
+_save_ckpt = False
+
 ############################# build the global model #############################
 with tf.name_scope('input_pipeline'):
     train_dataset = BuildInputPipeline(file_name_list=train_data_path,
@@ -51,11 +54,10 @@ with tf.name_scope('train_loss'):
     tf.summary.scalar(name='train_loss', tensor=batch_loss)
 
 with tf.name_scope('optimization'):
+    # define a placeholder to control learning raw
+    lr = tf.placeholder(dtype=tf.float32, shape=[], name='learning_rate')
     # optimize the model
-    #optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
-    #grad_var_pairs = optimizer.compute_gradients(loss)
-    #train_op = optimizer.apply_gradients(grad_var_pairs, global_step=global_step)
-    train_op = tf.train.GradientDescentOptimizer(learning_rate=1e-3).minimize(batch_loss, global_step)
+    train_op = tf.train.GradientDescentOptimizer(lr).minimize(batch_loss, global_step)
 '''
     train_op = tf.train.AdamOptimizer(learning_rate=1e-3,
                                        beta1=0.9,
@@ -71,17 +73,18 @@ with tf.name_scope('train_batch_accuracy'):
     # summary the batch accuracy
     tf.summary.scalar(name='train_accuracy', tensor=batch_accuracy)
 
-############################# define the validation #############################
+
 
 # build the training process
-def train(epochs):
+def Train(epochs):
     ''' input:  epochs --- number of epochs '''
     # initialize counters
     accuracy = 0
     current_acc = 0
     current_epoch = 0
     # build tf saver
-    saver = tf.train.Saver()
+    if _save_ckpt:
+        saver = tf.train.Saver()
     # build the tensorboard summary
     summary_writer = tf.summary.FileWriter(summary_path+summary_name)
     merged_train_summary = tf.summary.merge_all()
@@ -145,9 +148,63 @@ def train(epochs):
             # whether to save current weights or not
             if accuracy < current_acc:
                 # save
-                print('model is improved, save the result')
-                saver.save(sess=sess, save_path=model_path, global_step=global_step_val)
+                if _save_ckpt:
+                    print('model is improved, save the result')
+                    saver.save(sess=sess, save_path=model_path, global_step=global_step_val)
+                else:
+                    print('model is improved')
                 accuracy = current_acc
+    # finished
+    print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
+    print('Best accuracy = %.2f%%'%(accuracy*100))
+
+# build a process to find best initial learning rate
+def FindBestLR(batch_num):
+    ''' input : batch_num   number of batches to train '''
+    # create tf session
+    with tf.Session() as sess:
+        # initialize learning rate
+        current_lr = 1e-5
+        # initialize variables
+        sess.run(tf.global_variables_initializer())
+        sess.run(tf.local_variables_initializer())
+        # get training dataset iterator handle
+        train_handle_val = sess.run(train_handle)
+        # training loop
+        current_epoch = 0
+        current_batch = 0
+        while True:
+            # update epoch counter
+            current_epoch += 1
+            print('Current epoch num = %d'%(current_epoch))
+            # re-initialize training dataset iterators
+            sess.run([train_iterator.initializer])
+            # train single epoch
+            while True:
+                try:
+                    # train on single batch
+                    _, batch_loss_val, global_step_val, train_summary_buff = \
+                                sess.run([train_op, batch_loss, global_step, merged_train_summary],
+                                         feed_dict={handle : train_handle_val, lr : current_lr})
+                    current_batch += 1
+                    # print indication info
+                    print('\tbatch number = %d, learning rate = %.2e, training loss = %.2f%%'%\
+                    (current_batch, current_lr, batch_loss_val))
+                    # write train summary
+                    summary_writer.add_summary(summary=train_summary_buff, global_step=global_step_val)
+                    # update learning rate
+                    current_lr *= 2
+                    # control break condition
+                    if current_batch >= batch_num:
+                        break
+                except tf.errors.OutOfRangeError:
+                    break
+            # control break condition
+            if current_batch >= batch_num:
+                break
+        # finished
+        print('+++++++++++++++++++++++++++++++completed++++++++++++++++++++++++++++++++++')
+
 
 # main entrance
 if __name__ == "__main__":
@@ -159,4 +216,4 @@ if __name__ == "__main__":
     for option, value in options:
         if option == '--logdir':
             summary_name = value
-    train(num_epochs)
+    Train(num_epochs)
