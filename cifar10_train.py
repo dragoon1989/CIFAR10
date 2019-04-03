@@ -161,6 +161,9 @@ def Train(epochs):
 # build a process to find best initial learning rate
 def FindBestLR(batch_num):
     ''' input : batch_num   number of batches to train '''
+    # build the tensorboard summary
+    summary_writer = tf.summary.FileWriter(summary_path+summary_name)
+    merged_train_summary = tf.summary.merge_all()
     # create tf session
     with tf.Session() as sess:
         # initialize learning rate
@@ -188,7 +191,7 @@ def FindBestLR(batch_num):
                                          feed_dict={handle : train_handle_val, lr : current_lr})
                     current_batch += 1
                     # print indication info
-                    print('\tbatch number = %d, learning rate = %.2e, training loss = %.2f%%'%\
+                    print('\tbatch number = %d, learning rate = %.2e, training loss = %.2f'%\
                     (current_batch, current_lr, batch_loss_val))
                     # write train summary
                     summary_writer.add_summary(summary=train_summary_buff, global_step=global_step_val)
@@ -217,4 +220,4 @@ if __name__ == "__main__":
         if option == '--logdir':
             summary_name = value
     #Train(num_epochs)
-    FindBestLR(num_batch=10)
+    FindBestLR(10)
