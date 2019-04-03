@@ -216,4 +216,5 @@ if __name__ == "__main__":
     for option, value in options:
         if option == '--logdir':
             summary_name = value
-    Train(num_epochs)
+    #Train(num_epochs)
+    FindBestLR(num_batch=10)
