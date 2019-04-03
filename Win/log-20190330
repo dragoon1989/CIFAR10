@@ -5,3 +5,5 @@
 （3）使用GradientDescend作为优化器，初始lr=1e-4：训练缓慢，精度缓慢上升到约43%
 （3）使用GradientDescend作为优化器，初始lr=1e-3：精度逐渐上升到约63%
 这说明使用he normal作为初始化，确实减少了relu激活造成的death，模型训练对lr的容忍度大幅度提高了。但是使用固定的lr和GradientDescend训练确实速度比较慢，这一点仍然不如Adam这种自适应lr的优化器。
+（4）在卷积层后面、激活之前添加BN，使用GradientDescend作为优化器，lr=1e-3，最终精度大约是62%
+（3）在全连接层后面也添加BN，最终精度同样大约是62%
