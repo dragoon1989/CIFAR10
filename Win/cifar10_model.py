@@ -47,8 +47,7 @@ def inference(images):
 		pool = keras.layers.MaxPool2D(pool_size=(2,2),
 							   strides=(2,2),
 							   padding='same')(conv)
-		#drop = tf.layers.dropout(pool, rate=0.25, name=scope.name)
-		drop = pool
+		drop = tf.layers.dropout(pool, rate=0.25, name=scope.name)
 
 	with tf.variable_scope('conv2') as scope:
 		conv_layer3 = keras.layers.Conv2D(filters=128,
@@ -83,8 +82,7 @@ def inference(images):
 		pool = keras.layers.MaxPool2D(pool_size=(2,2),
 							   strides=(2,2),
 							   padding='same')(conv)
-		#drop = tf.layers.dropout(pool, rate=0.25, name=scope.name)
-		drop = pool
+		drop = tf.layers.dropout(pool, rate=0.25, name=scope.name)
 
 	with tf.variable_scope('fully_connected') as scope:
 		flat = tf.reshape(drop, [-1, 4 * 4 * 128])
@@ -97,9 +95,7 @@ def inference(images):
 		fc = fc_layer1.apply(flat)
 		# summary fc-1 weights
 		#tf.summary.histogram(name='fc-1_weights', values=fc_layer1.weights[0])
-		#fc = tf.layers.dense(inputs=flat, units=1500, activation=tf.nn.relu)
-		#drop = tf.layers.dropout(fc, rate=0.5)
-		drop = fc
+		drop = tf.layers.dropout(fc, rate=0.5)
 		logits_before_softmax = keras.layers.Dense(units=cifar10_categories, activation=None)(drop)
 		#logits_before_softmax = tf.layers.dense(inputs=drop, units=10, activation=None, name=scope.name)
 	# over, this should be passed to a softmax layer to get correct prediction
