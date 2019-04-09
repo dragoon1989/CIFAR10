@@ -17,7 +17,7 @@ test_data_path = ['./data/test_batch.bin']
 model_path = './tmp/'
 summary_path = './tensorboard/'
 summary_name = 'summary-default'    # tensorboard default summary dir
-num_epochs = 20
+num_epochs = 50
 
 # add a switch to control model checkpoint saver (because we do not need checkpoint when studying)
 _save_ckpt = False
@@ -72,150 +72,116 @@ with tf.name_scope('train_batch_accuracy'):
     tf.summary.scalar(name='train_accuracy', tensor=batch_accuracy)
 
 
+# build the training and validation process
+def train(cur_lr, sess, summary_writer, summary_op):
+	# get iterator handles
+	train_handle_val = sess.run(train_handle)
+	# initialize iterator
+	sess.run(train_iterator.initializer)
+	# training loop
+	current_batch = 0
+	while True:
+		try:
+			_, batch_loss_val, batch_acc_val, global_step_val, train_summary_buff = \
+				sess.run([train_op, batch_loss, batch_accuracy, global_step, summary_op],
+						feed_dict={handle : train_handle_val, lr : cur_lr})
+			current_batch += 1
+			# print indication info
+			if current_batch % 50 == 0:
+				msg = '\tbatch number = %d, loss = %.2f, train accuracy = %.2f%%' % \
+						(current_batch, batch_loss_val, batch_acc_val*100)
+				print(msg)
+				# write train summary
+				summary_writer.add_summary(summary=train_summary_buff, global_step=global_step_val)
+		except tf.errors.OutOfRangeError:
+			break
+	# over
 
-# build the training process
-def Train(epochs):
-    ''' input:  epochs --- number of epochs '''
-    # initialize counters
-    accuracy = 0
-    current_acc = 0
-    current_epoch = 0
-    # build tf saver
-    if _save_ckpt:
-        saver = tf.train.Saver()
-    # build the tensorboard summary
-    summary_writer = tf.summary.FileWriter(summary_path+summary_name)
-    merged_train_summary = tf.summary.merge_all()
-    # create tf session
-    with tf.Session() as sess:
-        # save the graph
-        summary_writer.add_graph(graph=sess.graph)
-        # initialize variables
-        sess.run(tf.global_variables_initializer())
-        sess.run(tf.local_variables_initializer())
-        # get iterator handles
-        train_handle_val, test_handle_val = sess.run([train_handle, test_handle])
-        # training loop
-        for current_epoch in range(1,epochs+1):
-            print('Current epoch num = %d'%(current_epoch))
-            # re-initialize dataset iterators
-            sess.run([train_iterator.initializer])
-            # training part
-            current_batch = 0
-            while True:
-                try:
-                    # train on single batch
-                    _, batch_accuracy_val, global_step_val, train_summary_buff = \
-                                sess.run([train_op, batch_accuracy, global_step, merged_train_summary],
-                                         feed_dict={handle : train_handle_val})
-                    current_batch += 1
-                    # print indication info
-                    if current_batch % 50 == 0:
-                        msg = '\tbatch number = %d, train accuracy = %.2f%%' % (current_batch, batch_accuracy_val*100)
-                        # write train summary
-                        summary_writer.add_summary(summary=train_summary_buff, global_step=global_step_val)
-                        # validation part
-                        sess.run([test_iterator.initializer])
-                        correctness = 0
-                        loss_val = 0
-                        while True:
-                            try:
-                                # test on single batch
-                                labels_val, batch_predictions_val, total_loss_val = \
-                                            sess.run([labels, batch_predictions, total_loss],
-                                                     feed_dict={handle : test_handle_val})
-                                correctness += np.asscalar(np.sum(a=(batch_predictions_val==labels_val), dtype=np.float32))
-                                loss_val += np.asscalar(total_loss_val)
-                            except tf.errors.OutOfRangeError:
-                                break
-                        current_acc = correctness/test_set_size
-                        loss_val /= test_set_size
-                        msg += ', test accuracy = %.2f%%' % (current_acc*100)
-                        test_acc_summary = tf.Summary(value=[tf.Summary.Value(tag='test_accuracy',simple_value=current_acc)])
-                        test_loss_summary = tf.Summary(value=[tf.Summary.Value(tag='test_loss', simple_value=loss_val)])
-                        # write summary
-                        summary_writer.add_summary(summary=test_acc_summary, global_step=global_step_val)
-                        summary_writer.add_summary(summary=test_loss_summary, global_step=global_step_val)
-                        # print message
-                        print(msg)
-                except tf.errors.OutOfRangeError:
-                    break
-
-            # save current best model parameters
-            print('Epoch %d accuracy : %.2f%%'%(current_epoch, current_acc*100))
-            # whether to save current weights or not
-            if accuracy < current_acc:
-                # save
-                if _save_ckpt:
-                    print('model is improved, save the result')
-                    saver.save(sess=sess, save_path=model_path, global_step=global_step_val)
-                else:
-                    print('model is improved')
-                accuracy = current_acc
-    # finished
-    print('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
-    print('Best accuracy = %.2f%%'%(accuracy*100))
-
-# build a process to find best initial learning rate
-def FindBestLR(batch_num):
-    ''' input : batch_num   number of batches to train '''
-    # build the tensorboard summary
-    summary_writer = tf.summary.FileWriter(summary_path+summary_name)
-    merged_train_summary = tf.summary.merge_all()
-    # create tf session
-    with tf.Session() as sess:
-        # initialize learning rate
-        current_lr = 1e-5
-        # initialize variables
-        sess.run(tf.global_variables_initializer())
-        sess.run(tf.local_variables_initializer())
-        # get training dataset iterator handle
-        train_handle_val = sess.run(train_handle)
-        # training loop
-        current_epoch = 0
-        current_batch = 0
-        while True:
-            # update epoch counter
-            current_epoch += 1
-            print('Current epoch num = %d'%(current_epoch))
-            # re-initialize training dataset iterators
-            sess.run([train_iterator.initializer])
-            # train single epoch
-            while True:
-                try:
-                    # train on single batch
-                    _, batch_loss_val, global_step_val, train_summary_buff = \
-                                sess.run([train_op, batch_loss, global_step, merged_train_summary],
-                                         feed_dict={handle : train_handle_val, lr : current_lr})
-                    current_batch += 1
-                    # print indication info
-                    print('\tbatch number = %d, learning rate = %.2e, training loss = %.2f'%\
-                    (current_batch, current_lr, batch_loss_val))
-                    # write train summary
-                    summary_writer.add_summary(summary=train_summary_buff, global_step=global_step_val)
-                    # update learning rate
-                    current_lr *= 2
-                    # control break condition
-                    if current_batch >= batch_num:
-                        break
-                except tf.errors.OutOfRangeError:
-                    break
-            # control break condition
-            if current_batch >= batch_num:
-                break
-        # finished
-        print('+++++++++++++++++++++++++++++++completed++++++++++++++++++++++++++++++++++')
-
+def validate(sess, summary_writer):
+	# get iterator handle
+	test_handle_val = sess.run(test_handle)
+	# initialize iterator
+	sess.run(test_iterator.initializer)
+	# validation loop
+	correctness = 0
+	loss_val = 0
+	
+	while True:
+		try:
+			# test on single batch
+			labels_val, batch_predictions_val, total_loss_val, global_step_val = \
+						sess.run([labels, batch_predictions, total_loss, global_step],
+								 feed_dict={handle : test_handle_val})
+			correctness += np.asscalar(np.sum(a=(batch_predictions_val==labels_val), dtype=np.float32))
+			loss_val += np.asscalar(total_loss_val)
+		except tf.errors.OutOfRangeError:
+			break
+	
+	current_acc = correctness/test_set_size
+	loss_val /= test_set_size
+	# print and summary
+	msg = 'test accuracy = %.2f%%' % (current_acc*100)
+	test_acc_summary = tf.Summary(value=[tf.Summary.Value(tag='test_accuracy',simple_value=current_acc)])
+	test_loss_summary = tf.Summary(value=[tf.Summary.Value(tag='test_loss', simple_value=loss_val)])
+	# write summary
+	summary_writer.add_summary(summary=test_acc_summary, global_step=global_step_val)
+	summary_writer.add_summary(summary=test_loss_summary, global_step=global_step_val)
+	# print message
+	print(msg)
+	# over
+	return current_acc
 
 # main entrance
 if __name__ == "__main__":
-    try:
-        options, args = getopt.getopt(sys.argv[1:], '', ['logdir='])
-    except getopt.GetoptError:
-        print('invalid arguments!')
-        sys.exit(-1)
-    for option, value in options:
-        if option == '--logdir':
-            summary_name = value
-    #Train(num_epochs)
-    FindBestLR(10)
+	try:
+		options, args = getopt.getopt(sys.argv[1:], '', ['logdir='])
+	except getopt.GetoptError:
+		print('invalid arguments!')
+		sys.exit(-1)
+	for option, value in options:
+		if option == '--logdir':
+			summary_name = value
+	# train and test the model
+	cur_lr = lr0
+	best_acc = 0
+	with tf.Session() as sess:
+		# initialize variables
+		sess.run(tf.global_variables_initializer())
+		sess.run(tf.local_variables_initializer())
+		# initialize IO
+		# build tf saver
+		saver = tf.train.Saver()
+		# build the tensorboard summary
+		summary_writer = tf.summary.FileWriter(summary_path+summary_name)
+		train_summary_op = tf.summary.merge_all()
+		# train in epochs
+		for cur_epoch in range(1, num_epoch+1):
+			# print epoch title
+			print('Current epoch No.%d, learning rate = %.2e' % (cur_epoch, cur_lr))
+			# train
+			train(cur_lr, sess, summary_writer, train_summary_op)
+			# validate
+			cur_acc = validate(sess, summary_writer)
+			# update learning rate if necessary
+			if cur_epoch > 10:
+				cur_lr = lr0/10
+			if cur_epoch >20:
+				cur_lr = lr0/100
+			if cur_epoch >30:
+				cur_lr = lr0/1000
+			if cur_epoch >40:
+				cur_lr = lr0/2000
+				
+			if cur_acc > best_acc:
+				# save check point
+				saver.save(sess=sess,save_path=model_path+best_model_ckpt)
+				# print message
+				print('model improved, save the ckpt.')
+				# update best loss
+				best_acc = cur_acc
+			else:
+				# print message
+				print('model not improved.')
+	# finished
+	print('++++++++++++++++++++++++++++++++++++++++')
+	print('best accuracy = %.2f%%.'%(best_acc*100))
