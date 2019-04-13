@@ -1,7 +1,23 @@
 import tensorflow as tf
 
-# cifar10 image size = 32x32
-cifar10_size = 32
+# cifar10 classes = 10
+NUM_CLASSES = 10
+# raw cifar10 image size = 32x32 with RGB channels
+RAW_IMAGE_SIZE = 32
+IMAGE_C = 3
+# this size is too small to be fed to AlexNet, so the raw image will be zoomed up in pipeline
+IMAGE_X = 224
+IMAGE_Y = 224
+
+# zoom up to be implemented !!!!
+def __zoom_up_single_image(image):
+	'''
+	input:
+		image : single raw image (RAW_IMAGE_SIZE x RAW_IMAGE_SIZE x IMAGE_C, dtype=tf.float32
+	output:
+		resized image (IMAG_X x IMAG_Y x IMAGE_C, dtype=tf.float32)
+	'''
+	return tf.image.resize_bilinear(images=image, size=[IMAGE_X, IMAGE_Y])
 
 # parse single example from cifar10 dataset
 def __parse_single_example(example):
@@ -14,9 +30,9 @@ def __parse_single_example(example):
 	# reshape to scalar tensor
 	label = tf.reshape(tensor=label, shape=[])
 	# convert image to tf.float32
-	image = tf.to_float(raw_bytes[1:(1+cifar10_size*cifar10_size*3)])
+	image = tf.to_float(raw_bytes[1:(1+RAW_IMAGE_SIZE*RAW_IMAGE_SIZE*3)])
 	# reshape image to CHW format
-	image = tf.reshape(tensor=image, shape=[3, cifar10_size, cifar10_size])
+	image = tf.reshape(tensor=image, shape=[3, RAW_IMAGE_SIZE, RAW_IMAGE_SIZE])
 	# permute the image to HWC format (use tf.transpose)
 	#image = tf.transpose(a=image, perm=[2, 0, 1])
 	image = tf.transpose(a=image, perm=[1, 2, 0])/255.0
@@ -30,7 +46,7 @@ def __read_single_file(file_name):
 	''' input:	file_name --- single data file name (scalar string tensor)
 	   output:	dataset --- a dataset that consists of (label, image) elements'''
 	# build a fixed length dataset
-	dataset = tf.data.FixedLengthRecordDataset(filenames=file_name, record_bytes=1+3*cifar10_size*cifar10_size)
+	dataset = tf.data.FixedLengthRecordDataset(filenames=file_name, record_bytes=1+3*RAW_IMAGE_SIZE*RAW_IMAGE_SIZE)
 	# parse all examples and form a new dataset
 	dataset = dataset.map(map_func=__parse_single_example)
 	# over
@@ -54,6 +70,10 @@ def BuildInputPipeline(file_name_list,
 								     cycle_length=4,
 								     block_length=16,
 								     num_parallel_calls=num_parallel_calls)
+	# build a dataset of resized images
+	
+	dataset = dataset.map(map_func=lambda label, image:label,__zoom_up_single_image(image), \
+						  num_parallel_calls=num_parallel_calls)
 	# set the epoch
 	dataset = dataset.repeat(count=num_epoch)
 	# shuffle the dataset
